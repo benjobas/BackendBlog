@@ -111,8 +111,41 @@ test('blog without title or url is not added', async () => {
   assert.strictEqual(finalBlogs.length, initialBlogs.length)
 })
 
+test ('a blog can be deleted', async () => {
+  const blogsAtStart = await Blog.find({})
+  const blogToDelete = blogsAtStart[0]
 
+  await api
+    .delete(`/api/blogs/${blogToDelete.id}`)
+    .expect(204)
 
+  const blogsAtEnd = await Blog.find({})
+  assert.strictEqual(blogsAtEnd.length, initialBlogs.length - 1)
+
+  const titles = blogsAtEnd.map(blog => blog.title)
+  assert(!titles.includes(blogToDelete.title))
+})
+
+test('a blog can be updated', async () => {
+  const blogsAtStart = await Blog.find({})
+  const blogToUpdate = blogsAtStart[0]
+  const updatedBlog = {
+    title: 'Updated Blog',
+    author: 'Updated Author',
+    url: 'http://example.com/updated',
+    likes: 10
+  }
+
+  await api
+    .put(`/api/blogs/${blogToUpdate.id}`)
+    .send(updatedBlog)
+    .expect(200)
+
+  const blogsAtEnd = await Blog.find({})
+  const titles = blogsAtEnd.map(blog => blog.title)
+  assert(titles.includes('Updated Blog'))
+  assert(!titles.includes(blogToUpdate.title))
+})
 after(async () => {
   await mongoose.connection.close()
 })
