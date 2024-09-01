@@ -28,6 +28,19 @@ const initialBlogs = [
 
 beforeEach(async () => {
   await Blog.deleteMany({})
+  await User.deleteMany({})
+
+  const passwordHash = await bcrypt.hash('sekret', 10)
+  const user = new User({ username: 'Pepedos', passwordHash })
+  await user.save()
+
+  const loggedInUser = await api
+  .post ('/api/login')
+  .send({ username: 'Pepedos', password: 'sekret' })
+
+  const token = loggedInUser.body.token
+  globalThis.userToken = `Bearer ${token}`
+
   await Blog.insertMany(initialBlogs)
 })
 
@@ -50,6 +63,7 @@ test('a valid blog can be added', async () => {
   }
   await api
   .post('/api/blogs')
+  .set('Authorization', globalThis.userToken)
   .send(newBlog)
   .expect(201)
   .expect('Content-Type', /application\/json/)
@@ -81,6 +95,7 @@ test('blog without likes property defaults to 0', async () => {
   }
   await api
     .post('/api/blogs')
+    .set('Authorization', globalThis.userToken)
     .send(newBlog)
     .expect(201)
     .expect('Content-Type', /application\/json/)
@@ -102,11 +117,13 @@ test('blog without title or url is not added', async () => {
   }
   await api
     .post('/api/blogs')
+    .set('Authorization', globalThis.userToken)
     .send(newBlogWithoutTitle)
     .expect(400)
 
   await api
     .post('/api/blogs')
+    .set('Authorization', globalThis.userToken)
     .send(newBlogWithoutUrl)
     .expect(400)
 
@@ -115,15 +132,23 @@ test('blog without title or url is not added', async () => {
 })
 
 test ('a blog can be deleted', async () => {
-  const blogsAtStart = await Blog.find({})
-  const blogToDelete = blogsAtStart[0]
+  const user = await User.findOne({ username: 'Pepedos' });
+  const blogToDelete = new Blog({
+    title: 'Blog to Delete',
+    author: 'Author',
+    url: 'http://example.com/delete',
+    user: user.id,
+  });
+
+  await blogToDelete.save()
 
   await api
     .delete(`/api/blogs/${blogToDelete.id}`)
+    .set('Authorization', globalThis.userToken)
     .expect(204)
 
   const blogsAtEnd = await Blog.find({})
-  assert.strictEqual(blogsAtEnd.length, initialBlogs.length - 1)
+  assert.strictEqual(blogsAtEnd.length, initialBlogs.length)
 
   const titles = blogsAtEnd.map(blog => blog.title)
   assert(!titles.includes(blogToDelete.title))
@@ -198,8 +223,61 @@ describe('when there is initially one user in db', () => {
       .expect('Content-Type', /application\/json/)
 
       const usersAtEnd = await helper.usersInDb()
-      assert(result.body.error.includes('`username` to be unique'))
+      assert(result.body.error.includes('username must be unique'))
       assert.strictEqual(usersAtEnd.length, usersAtStart.length)
+  })
+
+  test('creation fails with proper statuscode and message if username is too short', async () => {
+      const usersAtStart = await helper.usersInDb()
+
+      const newUser = {
+        username: 'ro',
+        name: 'Superuser',
+        password:'validpassword'
+      }
+
+      const result = await api
+      .post('/api/users')
+      .send(newUser)
+      .expect(400)
+      .expect('Content-Type', /application\/json/)
+
+      assert(result.body.error.includes('username must be at least 3 characters long'))
+      const usersAtEnd = await helper.usersInDb()
+      assert.strictEqual(usersAtEnd.length, usersAtStart.length)
+  })
+  test('creation fails with proper statuscode and message if password is too short', async () => {
+    const usersAtStart = await helper.usersInDb()
+
+    const newUser = {
+      username: 'validuser',
+      name: 'User with Short Password',
+      password: 'pw',
+    }
+
+    const result = await api
+      .post('/api/users')
+      .send(newUser)
+      .expect(400)
+      .expect('Content-Type', /application\/json/)
+
+    assert(result.body.error.includes('password must be at least 3 characters long'))
+
+    const usersAtEnd = await helper.usersInDb()
+    assert.strictEqual(usersAtEnd.length, usersAtStart.length)
+  })
+  
+  test('got response with proper status code if unauthorized', async () => {
+    const newBlog = {
+      title: 'Third Blog',
+      author: 'Author Three',
+      url: 'http://example.com/3',
+      likes: 3
+    }
+    await api
+    .post('/api/blogs')
+    .send(newBlog)
+    .expect(401)
   })
 })
 

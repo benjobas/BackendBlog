@@ -1,0 +1,7 @@
+DELETE http://localhost:3003/api/blogs/66d3aa5d5851d5aa5c72468a
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IlBlcGUiLCJpZCI6IjY2ZDNhYTQxNTg1MWQ1YWE1YzcyNDY4NiIsImlhdCI6MTcyNTE0NzcxOX0.9G-FrwAqIP2lfVpgMs9KxCtiSHc0dIlI_O9B5fvG_MY
+
+{
+  "id": "66d3aa5d5851d5aa5c72468a"
+}
